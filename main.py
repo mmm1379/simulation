@@ -72,6 +72,7 @@ for i in range(1,len(requestProbs)):
 
 
 class Request:
+    
     def __init__(self, arrivalTime) -> None:
         self.arrivalTime = arrivalTime
         self.Type = self.generateType()
@@ -82,14 +83,24 @@ class Request:
         for i in len(requestProbs):
             if prob*100 < requestProbs[i]:
                 return typeRequests[i]
+            
+    def passTime(self):
+        pass
+        
+        
 
 class ServiceInstance:
     def __init__(self, Type) -> None:
         self.Type = Type
         self.active = False
+        self.duration = 0
     
     def start(self):
         self.active = True
+        self.duration = round(numpy.random.exponential(meanServiceTimes[self.Type]))
+
+    def passTime(self):
+        pass
         
         
     
@@ -98,14 +109,17 @@ class Service:
     def __init__(self,instanceNumber, Type) -> None:
         self.queue = []
         self.instances = self.generateInstances(instanceNumber)
-        
         self.Type = Type
+        
     def generateInstances(instanceNumber):
         result = []
         for _ in range(instanceNumber):
             result.append(ServiceInstance())
-    def passTime():
-
+        return result
+    
+    # def passTime(self):
+        
+        
 
 
 service_instances = (list(map(int, input().split())))
@@ -122,6 +136,7 @@ time = 0
 for _ in range(duration):
     for _ in range(request_rate):
         request = Request(time)
+        
 
     
     time += 1
