@@ -1,7 +1,9 @@
 import enum
-import queue
 import random
 import numpy
+from tqdm import tqdm
+
+serviceQueueSize = {}
 
 class requestName(enum.Enum):
     mobileRequest = 0
@@ -75,6 +77,8 @@ for i in range(1,len(requestProbs)):
 class Request:
     
     def __init__(self, arrivalTime) -> None:
+        self.waitTime = 0
+        self.addToQueueTime = 0
         self.instances = []
         self.arrivalTime = arrivalTime
         self.Type = self.generateType()
@@ -101,11 +105,10 @@ class ServiceInstance:
         self.Type = Type
         self.active = False
         self.duration = 0
-        self.timePassed = 0
+        self.activeTime = 0
         self.waiting = False
     
     def start(self, request:Request):
-        print(request.arrivalTime,request.Type.requestName,self.Type,time)
         if len(request.instances) == 0:
             self.parentInstance = None
         else:
@@ -123,7 +126,9 @@ class ServiceInstance:
             services[next_service.value].requestArrival(request)
 
     def passTime(self):
-        self.timePassed += 1
+        self.activeTime += 1
+        
+        
         if self.waiting:
             return
         self.duration -= 1
@@ -142,7 +147,7 @@ class ServiceInstance:
     
     
 class Service:
-    def __init__(self,instanceNumber, Type) -> None:
+    def __init__(self, instanceNumber, Type) -> None:
         self.queue = []
         self.Type = Type
         self.instances = self.generateInstances(instanceNumber)
@@ -158,6 +163,8 @@ class Service:
         
         if len(find_instances) == 0:
             self.queue.append(request)
+            request.addToQueueTime = time
+            
         else:
             instance = random.choice(find_instances)
             instance.start(request)
@@ -171,6 +178,8 @@ class Service:
 
         return find_instances
     def passTime(self):
+        serviceQueueSize[self.Type] = serviceQueueSize.get(self.Type,0) + len(self.queue)
+            
         for service in self.instances:
             if service.active:
                 service.passTime()
@@ -183,8 +192,15 @@ class Service:
         for instance in find_instances:
             if len(self.queue) == 0:
                 break
+            
             request = self.queue.pop(0)
+            request.waitTime += (time - request.addToQueueTime)
             instance.start(request)
+    def finishedSimulation(self):
+        for request in self.queue:
+            request.waitTime += (time - request.addToQueueTime)
+        
+        
         
         
         
@@ -200,11 +216,36 @@ for i, instanceNum in enumerate(service_instances):
     services.append(Service(instanceNum, microServices(i)))
 
 time = 0
-
-for _ in range(duration):
+requests = []
+for _ in tqdm(range(duration)):
     for _ in range(request_rate):
         request = Request(time)
+        requests.append(request)
         
     for service in services:
         service.passTime()
     time += 1
+    
+for service in services:
+    service.finishedSimulation()
+
+averageQueueSize = {k: v / duration for k, v in serviceQueueSize.items()}
+
+print("Restaurant Management:" , averageQueueSize[microServices.restaurantManagement])
+print("Customer Management:" , averageQueueSize[microServices.customerManagement])
+print("Order Management:" , averageQueueSize[microServices.orderManagement])
+print("Courier Contact:" , averageQueueSize[microServices.courierContact])
+print("payments:" , averageQueueSize[microServices.payments])
+print("APIPort:" , averageQueueSize[microServices.APIPort])
+print("webPort:" , averageQueueSize[microServices.webPort])
+print(60*"-")
+
+totalWaitTime = 0
+for request in requests:
+    totalWaitTime += request.waitTime
+averageWaitTime = totalWaitTime / len(requests)
+print("average wait time for each request:", averageWaitTime)
+
+for service in services:
+    for i in range(len(service.instances)):
+        print(service.Type, "instance", i+1 ,":", service.instances[i].activeTime / duration)
