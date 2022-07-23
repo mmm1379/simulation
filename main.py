@@ -5,6 +5,26 @@ from tqdm import tqdm
 
 serviceQueueSize = {}
 
+class PriorityQueue():
+    def __init__(self) -> None:
+        self.queue1 = []
+        self.queue2 = []
+        self.firstPriorityTypes = (requestName.mobileRequest, requestName.webRequest, requestName.courierRequest)
+        
+    def append(self,request):
+        if request.Type.requestName in self.firstPriorityTypes:
+            self.queue1.append(request)
+        else:
+            self.queue2.append(request)
+            
+    def pop(self, index):
+        if len(self.queue1):
+            return self.queue1.pop(index)
+        return self.queue2.pop(index)
+    
+    def __len__(self):
+        return len(self.queue1) + len(self.queue2)
+        
 class requestName(enum.Enum):
     mobileRequest = 0
     webRequest = 1
@@ -67,6 +87,16 @@ meanServiceTimes = {
     microServices.webPort             : 3,
 }
 
+failureRate = {
+    microServices.restaurantManagement: 0.02,
+    microServices.customerManagement  : 0.02,
+    microServices.orderManagement     : 0.03,
+    microServices.courierContact      : 0.1,
+    microServices.payments            : 0.2,
+    microServices.APIPort             : 0.01,
+    microServices.webPort             : 0.01,
+}
+
 
 
 requestProbs = [20,10,5,25,15,20,5]
@@ -74,11 +104,12 @@ for i in range(1,len(requestProbs)):
     requestProbs[i] += requestProbs[i-1]
 
 
-errorProbs = [0.02, 0.02, 0.03, 0.1, 0.2, 0.01, 0.01]
 class Request:
     
     def __init__(self, arrivalTime) -> None:
         self.waitTime = 0
+        self.failed = False
+        self.timeout = False
         self.addToQueueTime = 0
         self.instances = []
         self.arrivalTime = arrivalTime
@@ -129,9 +160,15 @@ class ServiceInstance:
     def passTime(self):
         self.activeTime += 1
         
-        
         if self.waiting:
             return
+        
+        # if self.checkTimeout():
+        #     return
+        
+        if self.checkForFailure():
+            return
+        
         self.duration -= 1
         if self.duration != 0:
             return
@@ -139,17 +176,39 @@ class ServiceInstance:
         if self.parentInstance != None:
             self.parentInstance.waiting = False
 
+    def checkForFailure(self):
+        if random.random() < failureRate[self.Type]:
+            self.request.failed = True        
+            self.cancelRequest()
+            return True
+        return False
+        
+    def cancelRequest(self):
+        if self.parentInstance != None:
+            self.parentInstance.cancelRequest()
+        self.active = False
+        self.duration = 0
+        self.waiting = False
+        
+    # def checkTimeout(self):
+        
+    #     if time - self.request.arrivalTime > max_time[self.Type.value]:
+    #         self.request.timeout = True
+    #         self.cancelRequest()
+    #         return True
+    #     return False
 
+        
 
         
-    
+
         
         
     
-    
+
 class Service:
     def __init__(self, instanceNumber, Type) -> None:
-        self.queue = []
+        self.queue = PriorityQueue()
         self.Type = Type
         self.instances = self.generateInstances(instanceNumber)
         
@@ -180,7 +239,6 @@ class Service:
         return find_instances
     def passTime(self):
         serviceQueueSize[self.Type] = serviceQueueSize.get(self.Type,0) + len(self.queue)
-            
         for service in self.instances:
             if service.active:
                 service.passTime()
@@ -198,7 +256,9 @@ class Service:
             request.waitTime += (time - request.addToQueueTime)
             instance.start(request)
     def finishedSimulation(self):
-        for request in self.queue:
+        for request in self.queue.queue1:
+            request.waitTime += (time - request.addToQueueTime)
+        for request in self.queue.queue2:
             request.waitTime += (time - request.addToQueueTime)
         
         
@@ -241,13 +301,22 @@ print("APIPort:" , averageQueueSize[microServices.APIPort])
 print("webPort:" , averageQueueSize[microServices.webPort])
 print(60*"-")
 
+totalFailures = 0
+# totalTimeouts = 0
 totalWaitTime = 0
 for request in requests:
+    totalFailures += int(request.failed)
+    # totalTimeouts += int(request.timeout)
     totalWaitTime += request.waitTime
+    
 averageWaitTime = totalWaitTime / len(requests)
 print("total wait time of requests:", totalWaitTime)
 print("average wait time for each request:", averageWaitTime)
-
+print(60*"-")
 for service in services:
     for i in range(len(service.instances)):
-        print(service.Type, "instance", i+1 ,":", service.instances[i].activeTime / duration)
+        print(service.Type, "instance", i + 1 ,":", service.instances[i].activeTime / duration)
+print(60*"-")
+print("percentage of request failure:", 100* totalFailures/len(requests))
+# print(60*"-")
+# print("percentage of request timeouts:", 100* totalTimeouts/len(requests))
