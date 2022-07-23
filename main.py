@@ -74,6 +74,7 @@ for i in range(1,len(requestProbs)):
     requestProbs[i] += requestProbs[i-1]
 
 
+errorProbs = [0.02, 0.02, 0.03, 0.1, 0.2, 0.01, 0.01]
 class Request:
     
     def __init__(self, arrivalTime) -> None:
@@ -244,6 +245,7 @@ totalWaitTime = 0
 for request in requests:
     totalWaitTime += request.waitTime
 averageWaitTime = totalWaitTime / len(requests)
+print("total wait time of requests:", totalWaitTime)
 print("average wait time for each request:", averageWaitTime)
 
 for service in services:
